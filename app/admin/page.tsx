@@ -1,7 +1,16 @@
+import { Suspense } from "react";
 import { auth } from "@/auth/auth";
 import { redirect } from "next/navigation";
 
-export default async function AdminPage() {
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AdminContent />
+    </Suspense>
+  );
+}
+
+async function AdminContent() {
   const session = await auth();
 
   if (!session?.user) {

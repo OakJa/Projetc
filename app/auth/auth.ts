@@ -1,78 +1,69 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
-import bcrypt from "bcryptjs" // ดึง bcryptjs ที่เราติดตั้งไว้มาใช้ตรวจรหัสผ่าน
-import prisma from "@/lib/prisma";
+import bcrypt from "bcryptjs"
+import prisma from "@/lib/prisma"
+import type { Role } from "@/generated/prisma/client"
 
-
-export const { handlers, signIn, signOut, auth } = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  session: {
+    strategy: "jwt",
+  },
   providers: [
     Credentials({
+      name: "Credentials",
       credentials: {
-        email: {},
-        password: {},
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
-
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          return null;
+          return null
         }
 
         const user = await prisma.user.findUnique({
           where: {
             email: credentials.email as string,
           },
-        });
+        })
 
-        if (!user) {
-          return null;
+        if (!user || !user.passwordHash) {
+          return null
         }
 
         const passwordValid = await bcrypt.compare(
           credentials.password as string,
           user.passwordHash,
-        );
+        )
 
         if (!passwordValid) {
-          return null;
+          return null
         }
 
         return {
           id: user.id,
-          name: user.name,
+          name: user.name ?? user.email,
           email: user.email,
           role: user.role,
-        };
+        }
       },
     }),
   ],
-
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.role = user.role;
+        token.id = user.id
+        token.role = user.role as Role
       }
 
-      return token;
+      return token
     },
-
     async session({ session, token }) {
-      if (
-        session.user &&
-        typeof token.id === "string" &&
-        (token.role === "ADMIN" ||
-          token.role === "STAFF" ||
-          token.role === "USER")
-      ) {
-        session.user.id = token.id;
-        session.user.role = token.role;
+      if (session.user) {
+        session.user.id = token.id as string
+        session.user.role = token.role as Role
       }
 
-      return session;
+      return session
     },
   },
-
-  pages: {
-    signIn: "/login",
-  },
-});
+})
